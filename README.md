@@ -11,6 +11,12 @@ npm test         # engine, AI, puzzle and progression tests
 npm run build    # type-check + production build into dist/
 ```
 
+## Play online (GitHub Pages)
+
+`.github/workflows/deploy.yml` builds the game and publishes it on every push to `main` or `claude/gifted-wozniak-43cw6m`.
+One-time setup: **Settings → Pages → Build and deployment → Source: GitHub Actions**. The game is then at
+`https://<user>.github.io/NewGame/`.
+
 ## How it plays
 
 - **Take a Case:** a 5|0 game against the AI. You can play White, Black or a coin toss, and your color is always at the bottom of the board. There are three opponents: Rookie, Detective and Inspector.
