@@ -95,7 +95,7 @@ export function describeMove(st: GameState, m: Move): string {
   if (p.type === 'C') {
     const names = (s: number[]) => [...s].sort((a, b) => a - b).map(squareName).join('');
     const trample = m.captures.length > 1 ? ` (×${m.captures.length})` : '';
-    return `C${names(m.from)}${m.kind === 'pivot' ? '↻' : sep}${names(m.to)}${trample}`;
+    return `C${names(m.from)}${sep}${names(m.to)}${m.kind === 'pivot' ? ' (pivot)' : ''}${trample}`;
   }
   const letter = p.type === 'P' ? '' : p.type;
   const promo = m.promotion ? `=${m.promotion}` : '';

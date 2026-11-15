@@ -306,6 +306,16 @@ button:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
 }
 .eval-label.at-bottom { top: auto; bottom: 3px; }
 .toggles { margin-top: 12px; }
+.reminders { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+.reminder { margin-bottom: 8px; border: 1px dashed var(--line); padding: 6px 8px; }
+.reminder summary { display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; }
+.reminder summary::-webkit-details-marker { display: none; }
+.reminder summary::after { content: '▾'; margin-left: auto; color: var(--muted); font-size: 0.8rem; }
+.reminder:not([open]) summary::after { content: '▸'; }
+.reminder-name { font-family: var(--deco); font-size: 1rem; }
+.reminder-who { color: var(--lamp); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.reminder ul { margin: 6px 0 2px; padding-left: 18px; font-size: 0.82rem; color: #cfc8b9; }
+.reminder li { margin-bottom: 3px; }
 .tips { margin-top: 12px; margin-bottom: 0; }
 .clock {
   font-family: var(--type);

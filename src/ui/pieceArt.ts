@@ -101,7 +101,11 @@ export interface DrawOpts {
   phase?: MarshalPhase;
   alpha?: number;
   shadow?: boolean;
+  /** Knight only: red cavalry sash across the neck (marks the Cavalry's horses). */
+  sash?: boolean;
 }
+
+const SASH_RED = '#b3261e';
 
 /** Shadow offsets ignore the canvas transform, so scale them by hand. `unit` = 1% of a square. */
 function applyShadow(ctx: CanvasRenderingContext2D, on: boolean | undefined, unit = 1) {
@@ -134,6 +138,20 @@ export function drawPiece(
   ctx.lineJoin = 'round';
   ctx.stroke(a.body);
   a.detail?.(ctx, ink, fill);
+  if (type === 'N' && opts.sash) {
+    ctx.save();
+    ctx.clip(a.body);
+    ctx.strokeStyle = SASH_RED;
+    ctx.lineWidth = 9;
+    ctx.beginPath();
+    ctx.moveTo(30, 70);
+    ctx.lineTo(78, 52);
+    ctx.stroke();
+    ctx.restore();
+    ctx.strokeStyle = ink;
+    ctx.lineWidth = 3;
+    ctx.stroke(a.body);
+  }
   if (type === 'M') {
     ctx.fillStyle = ink;
     ctx.fill(circle(50, 44, 12));
@@ -146,45 +164,55 @@ export function drawPiece(
   ctx.restore();
 }
 
-/** Draw a Cavalry occupying the rectangle (x, y, w, h) — two squares side by side or stacked. */
+/**
+ * Draw a Cavalry occupying the rectangle (x, y, w, h) — two squares side by side or stacked.
+ * Two sashed horses joined by a shared pedestal bar, kept inside the same margins as ordinary
+ * pieces so square coordinates stay readable.
+ */
 export function drawCavalry(
   ctx: CanvasRenderingContext2D, color: Color, x: number, y: number, w: number, h: number,
   square: number, opts: DrawOpts = {},
 ): void {
   const { fill, ink } = PIECE_COLORS[color];
   const horizontal = w > h;
+  const pad = square * 0.06;
+  const size = square - pad * 2;
   ctx.save();
   ctx.globalAlpha = opts.alpha ?? 1;
-  // Shared saddle-cloth that ties both squares together.
-  const inset = square * 0.1;
+
+  // The bar linking the two horses: a harness yoke at neck height when side by side (clear of the
+  // file letters along the bottom edge), a spine when stacked.
+  const bar = horizontal
+    ? [x + square * 0.5, y + pad + size * 0.56, square, size * 0.09]
+    : [x + square * 0.5 - size * 0.07, y + square * 0.55, size * 0.14, square * 0.9];
   ctx.save();
   applyShadow(ctx, opts.shadow, square / 100);
   ctx.fillStyle = fill;
-  roundRect(ctx, x + inset, y + inset, w - inset * 2, h - inset * 2, square * 0.18);
+  roundRect(ctx, bar[0], bar[1], bar[2], bar[3], square * 0.03);
   ctx.fill();
   ctx.restore();
   ctx.strokeStyle = ink;
-  ctx.lineWidth = Math.max(1.5, square * 0.03);
-  roundRect(ctx, x + inset, y + inset, w - inset * 2, h - inset * 2, square * 0.18);
+  ctx.lineWidth = Math.max(1.2, square * 0.03);
+  roundRect(ctx, bar[0], bar[1], bar[2], bar[3], square * 0.03);
   ctx.stroke();
-  // Inner trim line.
-  ctx.setLineDash([square * 0.06, square * 0.05]);
-  ctx.lineWidth = Math.max(1, square * 0.015);
-  roundRect(ctx, x + inset * 1.8, y + inset * 1.8, w - inset * 3.6, h - inset * 3.6, square * 0.12);
+  // Red stitching down the middle of the bar.
+  ctx.strokeStyle = SASH_RED;
+  ctx.lineWidth = Math.max(1, square * 0.025);
+  ctx.setLineDash([square * 0.05, square * 0.04]);
+  ctx.beginPath();
+  if (horizontal) {
+    ctx.moveTo(bar[0], bar[1] + bar[3] / 2);
+    ctx.lineTo(bar[0] + bar[2], bar[1] + bar[3] / 2);
+  } else {
+    ctx.moveTo(bar[0] + bar[2] / 2, bar[1]);
+    ctx.lineTo(bar[0] + bar[2] / 2, bar[1] + bar[3]);
+  }
   ctx.stroke();
   ctx.setLineDash([]);
-  // A horse head on each square, in the cloth's inverse colors.
-  const head = new Path2D(KNIGHT_HEAD);
+
   const cells = horizontal ? [[x, y], [x + square, y]] : [[x, y], [x, y + square]];
   for (const [cx, cy] of cells) {
-    ctx.save();
-    ctx.translate(cx + square * 0.14, cy + square * 0.1);
-    ctx.scale((square * 0.72) / 100, (square * 0.72) / 100);
-    ctx.fillStyle = ink;
-    ctx.fill(head);
-    ctx.fillStyle = fill;
-    ctx.fill(circle(45, 31, 2.8));
-    ctx.restore();
+    drawPiece(ctx, 'N', color, cx + pad, cy + pad, size, { alpha: opts.alpha, shadow: opts.shadow, sash: true });
   }
   ctx.restore();
 }

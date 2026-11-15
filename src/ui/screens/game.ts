@@ -9,7 +9,7 @@ import { availableLoadouts, awardXp, xpForGame, levelInfo, type Outcome } from '
 import type { Color, PieceType } from '../../engine/types';
 import { opposite } from '../../engine/types';
 import { pieceIcon } from '../pieceArt';
-import { awardPanel, showModal, soundToggle } from '../components';
+import { awardPanel, pieceReminders, showModal, soundToggle } from '../components';
 import { sound } from '../../audio/sound';
 import { moveSounds } from '../../audio/moveSounds';
 import { AIClient } from '../../ai/client';
@@ -91,6 +91,16 @@ export const gameScreen: Screen<Extract<Route, { name: 'game' }>> = (app, root, 
   const status = h('div', { class: 'status', 'aria-live': 'polite' });
   const moves = h('ol', { class: 'moves' });
 
+  /** Custom pieces either army brings, so their rules can be shown during play. */
+  function specialPieces() {
+    const mine = LOADOUTS[app.progress.loadout].requires;
+    const theirs = LOADOUTS[aiLoadout].requires;
+    const list: { type: PieceType; color: Color; who: string }[] = [];
+    if (mine) list.push({ type: mine, color: route.color, who: mine === theirs ? 'Both sides' : 'Yours' });
+    if (theirs && theirs !== mine) list.push({ type: theirs, color: opposite(route.color), who: `${OPPONENTS[route.difficulty]}'s` });
+    return list;
+  }
+
   const leave = () => {
     if (match.result) { app.go({ name: 'menu' }); return; }
     const close = showModal(h('div', null,
@@ -111,6 +121,7 @@ export const gameScreen: Screen<Extract<Route, { name: 'game' }>> = (app, root, 
         h('button', { class: 'btn', on: { click: leave } }, 'Resign'),
         h('button', { class: 'btn ghost', on: { click: leave } }, 'Menu')),
       h('div', { class: 'row toggles' }, soundToggle(app)),
+      pieceReminders(specialPieces()),
       h('p', { class: 'muted small tips' },
         'Drag or click to move. While they think, queue a premove; right-click cancels it. ',
         'Right-click and drag to draw arrows (Shift or Alt for other colours).'))));

@@ -39,6 +39,25 @@ export function devToggle(app: App, onChange: () => void): HTMLButtonElement {
   return btn;
 }
 
+/**
+ * Collapsible rules reminders for the special pieces in a game. `pieces` lists each custom piece
+ * type with who fields it ("You", the opponent's name, or both).
+ */
+export function pieceReminders(pieces: { type: PieceType; color: Color; who: string }[]): HTMLElement | null {
+  if (!pieces.length) return null;
+  return h('section', { class: 'reminders' },
+    h('div', { class: 'case-label' }, 'Special pieces in play'),
+    ...pieces.map(({ type, color, who }) => {
+      const info = PIECE_INFO[type]!;
+      return h('details', { class: 'reminder', open: true },
+        h('summary', null,
+          pieceIcon(type, color, 22),
+          h('span', { class: 'reminder-name' }, info.name),
+          h('span', { class: 'reminder-who' }, who)),
+        h('ul', null, ...info.rules.map((r) => h('li', null, r))));
+    }));
+}
+
 export function xpBar(xp: number): HTMLElement {
   const { level, into, needed } = levelInfo(xp);
   const pct = Math.min(100, (into / needed) * 100);
