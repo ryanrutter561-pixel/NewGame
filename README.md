@@ -35,7 +35,7 @@ One-time setup: **Settings → Pages → Build and deployment → Source: GitHub
 - **Premove:** while the opponent is thinking, move a piece anyway. The move is queued (shown in slate blue) and plays the instant they reply, if it's still legal. Right-click or Esc cancels it.
 - **Draw:** right-click and drag to draw an arrow, or right-click a square to circle it. Hold Shift for gold or Alt for blue. A left-click clears them.
 - **Material:** the "+N" next to captured pieces shows who's ahead in material, counted from the starting armies, since armies can differ.
-- **Eval bar:** a bar beside the board shows the position's evaluation from a separate background engine, e.g. "1.4" pawns or "M3" (mate in 3). It can be toggled off, and it isn't shown in puzzles.
+- **Eval bar:** always on in games. A bar beside the board shows the position's evaluation from a separate background engine, e.g. "1.4" pawns or "M3" (mate in 3). It isn't shown in puzzles.
 
 ### Sound
 

@@ -55,7 +55,6 @@ export const gameScreen: Screen<Extract<Route, { name: 'game' }>> = (app, root, 
   const evalBar = new EvalBar(route.color);
   const analyst = new AIClient();
   const analyse = () => {
-    if (!app.progress.evalBar) return;
     const r = match.result;
     if (r) {
       evalBar.show({ result: r.winner === 'w' ? '1-0' : r.winner === 'b' ? '0-1' : '½-½' });
@@ -73,21 +72,7 @@ export const gameScreen: Screen<Extract<Route, { name: 'game' }>> = (app, root, 
       }
     });
   };
-  evalBar.el.hidden = !app.progress.evalBar;
-  const evalToggle = h('button', { class: 'sound-toggle', type: 'button' });
-  const renderEvalToggle = () => {
-    evalToggle.textContent = app.progress.evalBar ? '▮ Eval bar on' : '▮ Eval bar off';
-    evalToggle.classList.toggle('off', !app.progress.evalBar);
-    evalToggle.setAttribute('aria-pressed', String(app.progress.evalBar));
-  };
-  evalToggle.addEventListener('click', () => {
-    app.progress.evalBar = !app.progress.evalBar;
-    app.save();
-    evalBar.el.hidden = !app.progress.evalBar;
-    renderEvalToggle();
-    analyse();
-  });
-  renderEvalToggle();
+
 
   const bar = (color: Color, name: string, sub: string) => {
     const clock = h('div', { class: 'clock', 'aria-live': 'off' }, '5:00');
@@ -125,7 +110,7 @@ export const gameScreen: Screen<Extract<Route, { name: 'game' }>> = (app, root, 
       h('div', { class: 'row' },
         h('button', { class: 'btn', on: { click: leave } }, 'Resign'),
         h('button', { class: 'btn ghost', on: { click: leave } }, 'Menu')),
-      h('div', { class: 'row toggles' }, soundToggle(app), evalToggle),
+      h('div', { class: 'row toggles' }, soundToggle(app)),
       h('p', { class: 'muted small tips' },
         'Drag or click to move. While they think, queue a premove; right-click cancels it. ',
         'Right-click and drag to draw arrows (Shift or Alt for other colours).'))));

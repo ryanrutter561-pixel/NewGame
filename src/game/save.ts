@@ -18,7 +18,6 @@ export function loadProgress(): Progress {
       solvedPuzzles: Array.isArray(data.solvedPuzzles) ? data.solvedPuzzles : [],
       loadout: data.loadout && data.loadout in LOADOUTS ? data.loadout : 'standard',
       sound: data.sound !== false,
-      evalBar: data.evalBar !== false,
       stats: { ...base.stats, ...data.stats },
     };
   } catch {

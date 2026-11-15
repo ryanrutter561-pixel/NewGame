@@ -293,7 +293,6 @@ button:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
   box-shadow: 0 0 0 3px #050505;
   overflow: hidden;
 }
-.eval-bar[hidden] { display: none; }
 .eval-fill { position: absolute; left: 0; right: 0; bottom: 0; background: #efe8d8; transition: height 0.45s ease-out; }
 .eval-bar.flip { background: #efe8d8; }
 .eval-bar.flip .eval-fill { background: #1c1c1e; }
