@@ -13,6 +13,8 @@ export interface SearchOptions {
   timeMs: number;
   /** Random centipawn jitter added to evaluations — makes weaker levels err. */
   noise?: number;
+  /** Chance (0..1) of skipping the search and playing a random legal move — for beginner levels. */
+  randomMove?: number;
   random?: () => number;
   now?: () => number;
 }
@@ -73,6 +75,9 @@ class Searcher {
     let bestScore = -INF;
     let depthDone = 0;
     if (root.length === 1) return { move: best, score: 0, depth: 0, nodes: 0 };
+    if (this.opts.randomMove && this.rand() < this.opts.randomMove) {
+      return { move: root[Math.floor(this.rand() * root.length)], score: 0, depth: 0, nodes: 0 };
+    }
 
     for (let depth = 1; depth <= this.opts.maxDepth; depth++) {
       let alpha = -INF;

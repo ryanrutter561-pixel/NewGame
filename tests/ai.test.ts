@@ -23,6 +23,16 @@ describe('AI', () => {
     expect(moveKey(searchBestMove(st, opts).move!)).toBe('d1d5');
   });
 
+  it('random-move setting still only plays legal moves', () => {
+    const st = startingPosition('standard', 'standard');
+    for (let i = 0; i < 30; i++) {
+      const res = searchBestMove(st, { maxDepth: 1, timeMs: 200, randomMove: 1 });
+      if (!res.move) break;
+      expect(legalMoves(st).map(moveKey)).toContain(moveKey(res.move));
+      st.makeMove(res.move);
+    }
+  });
+
   it('plays legal moves with custom armies on both sides', () => {
     const st = startingPosition('cavalry', 'marshal');
     for (let i = 0; i < 12; i++) {
