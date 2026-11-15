@@ -29,6 +29,23 @@ One-time setup: **Settings → Pages → Build and deployment → Source: GitHub
   - Reaching level *n+1* takes 150·*n* XP.
 - **Unlocks:** the Marshal at level 3 and the Cavalry at level 5. Detective and Inspector opponents may field your unlocked pieces too.
 
+### Sound
+
+All sounds are synthesized live with the Web Audio API (`src/audio/sound.ts`), so there are no audio files:
+
+| Event | Sound |
+|---|---|
+| Move | wooden "tock" |
+| Capture | heavier thud plus the captured piece tipping over |
+| Check | tense, clashing piano stab |
+| Checkmate | "dun… dun… DUNNN" brass hits into a dark chord |
+| Win / puzzle solved | muted-trumpet blues lick resolving to a warm chord |
+| Loss | slow descending horn over a minor drone |
+| Draw | an unresolved tritone |
+
+A **♪ Sound** toggle (menu, game and puzzle screens) turns sound on or off and is saved with your progress.
+Each sound is one function in `SOUNDS`. Its loudness is set in `LEVEL`.
+
 ### Custom pieces
 
 | Piece | Replaces | Rules |
@@ -46,6 +63,7 @@ src/engine/   rules engine — board state, make/undo, move generation, check/ma
 src/ai/       negamax α-β search with quiescence, runs in a Web Worker
 src/game/     match controller, chess clock, puzzle runner, XP/levels/unlocks, save (localStorage)
 src/data/     puzzle definitions
+src/audio/    procedural sound effects (Web Audio) + which sounds a move triggers
 src/ui/       canvas board, vector piece art, screens, noir theme
 tests/        perft suites (standard chess correctness), custom pieces, AI, puzzles, progression
 ```

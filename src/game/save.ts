@@ -17,6 +17,7 @@ export function loadProgress(): Progress {
       xp: Math.max(0, Number(data.xp) || 0),
       solvedPuzzles: Array.isArray(data.solvedPuzzles) ? data.solvedPuzzles : [],
       loadout: data.loadout && data.loadout in LOADOUTS ? data.loadout : 'standard',
+      sound: data.sound !== false,
       stats: { ...base.stats, ...data.stats },
     };
   } catch {

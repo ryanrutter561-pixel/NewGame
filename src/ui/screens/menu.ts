@@ -1,6 +1,6 @@
 import type { Screen } from '../app';
 import { h } from '../dom';
-import { xpBar } from '../components';
+import { soundToggle, xpBar } from '../components';
 import { pieceIcon } from '../pieceArt';
 import { levelInfo, UNLOCKS } from '../../game/progression';
 import { PUZZLES } from '../../data/puzzles';
@@ -19,6 +19,7 @@ export const menuScreen: Screen = (app, root) => {
       h('span', { class: 'menu-sub' }, sub));
 
   root.append(h('main', { class: 'screen menu' },
+    h('div', { class: 'top-right' }, soundToggle(app)),
     h('header', { class: 'title-block' },
       h('div', { class: 'title-icons' }, pieceIcon('K', 'b', 44), pieceIcon('Q', 'w', 44)),
       h('h1', { class: 'title' }, 'Noir Chess'),

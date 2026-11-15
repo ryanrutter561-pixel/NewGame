@@ -4,7 +4,9 @@ import { BoardView } from '../board';
 import { PUZZLES } from '../../data/puzzles';
 import { PuzzleSession } from '../../game/puzzles';
 import { awardXp, xpForPuzzle } from '../../game/progression';
-import { awardPanel, pieceRulesCard, showModal } from '../components';
+import { awardPanel, pieceRulesCard, showModal, soundToggle } from '../components';
+import { sound } from '../../audio/sound';
+import { moveSounds } from '../../audio/moveSounds';
 import { goalText } from './cases';
 import type { Move } from '../../engine/types';
 
@@ -36,18 +38,21 @@ export const caseScreen: Screen<Extract<Route, { name: 'case' }>> = (app, root, 
       return;
     }
     board.reset();
-    if (fb === 'solved') { solved(); return; }
+    const sounds = moveSounds(session.state, m);
+    sound.play(...sounds);
+    if (fb === 'solved') { solved(sounds.includes('checkmate')); return; }
     say('Good. They respond…');
     busy = true;
     timer = window.setTimeout(() => {
-      session.opponentReply();
+      const reply = session.opponentReply();
+      if (reply) sound.play(...moveSounds(session.state, reply));
       busy = false;
       board.reset();
       say(`Your move. ${session.movesLeft === 1 && def.goal === 'mate' ? 'Finish it.' : ''}`);
     }, 650);
   };
 
-  const solved = () => {
+  const solved = (byMate: boolean) => {
     say('Case closed.', 'good');
     const first = !app.progress.solvedPuzzles.includes(def.id);
     if (first) app.progress.solvedPuzzles.push(def.id);
@@ -63,7 +68,7 @@ export const caseScreen: Screen<Extract<Route, { name: 'case' }>> = (app, root, 
       h('div', { class: 'row' },
         next ? h('button', { class: 'btn btn-accent', on: { click: () => { close(); app.go({ name: 'case', id: next.id }); } } }, 'Next case') : null,
         h('button', { class: 'btn', on: { click: () => { close(); app.go({ name: 'cases' }); } } }, 'All cases')));
-    window.setTimeout(() => { close = showModal(content); }, 450);
+    window.setTimeout(() => { sound.play('win'); close = showModal(content); }, byMate ? 1900 : 450);
   };
 
   const reset = () => {
@@ -94,7 +99,8 @@ export const caseScreen: Screen<Extract<Route, { name: 'case' }>> = (app, root, 
             },
           },
         }, 'Hint'),
-        h('button', { class: 'btn ghost', on: { click: reset } }, 'Reset')),
+        h('button', { class: 'btn ghost', on: { click: reset } }, 'Reset'),
+        soundToggle(app)),
       def.featured ? pieceRulesCard(def.featured) : null)));
 
   return () => {

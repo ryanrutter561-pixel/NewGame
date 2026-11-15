@@ -9,11 +9,13 @@ export interface Progress {
   xp: number;
   solvedPuzzles: string[];
   loadout: LoadoutId;
+  /** Sound effects on/off. */
+  sound: boolean;
   stats: { wins: number; losses: number; draws: number };
 }
 
 export const newProgress = (): Progress => ({
-  version: 1, xp: 0, solvedPuzzles: [], loadout: 'standard', stats: { wins: 0, losses: 0, draws: 0 },
+  version: 1, xp: 0, solvedPuzzles: [], loadout: 'standard', sound: true, stats: { wins: 0, losses: 0, draws: 0 },
 });
 
 export interface Unlock {

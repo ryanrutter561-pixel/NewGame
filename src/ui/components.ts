@@ -4,6 +4,26 @@ import { PIECE_INFO } from './pieceInfo';
 import { levelInfo, type Unlock, type XpAward } from '../game/progression';
 import type { App } from './app';
 import type { Color, PieceType } from '../engine/types';
+import { sound } from '../audio/sound';
+
+/** Sound on/off switch (saved with progress). */
+export function soundToggle(app: App): HTMLButtonElement {
+  const btn = h('button', { class: 'sound-toggle', type: 'button' });
+  const render = () => {
+    btn.textContent = app.progress.sound ? '♪ Sound on' : '♪ Sound off';
+    btn.setAttribute('aria-pressed', String(app.progress.sound));
+    btn.classList.toggle('off', !app.progress.sound);
+  };
+  btn.addEventListener('click', () => {
+    app.progress.sound = !app.progress.sound;
+    sound.enabled = app.progress.sound;
+    app.save();
+    render();
+    if (app.progress.sound) sound.play('move');
+  });
+  render();
+  return btn;
+}
 
 export function xpBar(xp: number): HTMLElement {
   const { level, into, needed } = levelInfo(xp);

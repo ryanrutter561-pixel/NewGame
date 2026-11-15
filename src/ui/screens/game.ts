@@ -9,7 +9,9 @@ import { availableLoadouts, awardXp, xpForGame, levelInfo, type Outcome } from '
 import type { Color, PieceType } from '../../engine/types';
 import { opposite } from '../../engine/types';
 import { pieceIcon } from '../pieceArt';
-import { awardPanel, showModal } from '../components';
+import { awardPanel, showModal, soundToggle } from '../components';
+import { sound } from '../../audio/sound';
+import { moveSounds } from '../../audio/moveSounds';
 import { OPPONENTS } from './setup';
 import type { EndReason } from '../../engine/rules';
 
@@ -78,7 +80,8 @@ export const gameScreen: Screen<Extract<Route, { name: 'game' }>> = (app, root, 
       h('div', { class: 'moves-wrap' }, moves),
       h('div', { class: 'row' },
         h('button', { class: 'btn', on: { click: leave } }, 'Resign'),
-        h('button', { class: 'btn ghost', on: { click: leave } }, 'Menu')))));
+        h('button', { class: 'btn ghost', on: { click: leave } }, 'Menu')),
+      soundToggle(app))));
 
   const renderCaptured = (el: HTMLElement, types: PieceType[], color: Color) => {
     const sorted = [...types].sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
@@ -88,7 +91,13 @@ export const gameScreen: Screen<Extract<Route, { name: 'game' }>> = (app, root, 
   let lastPly = -1;
   let shownResult = false;
   const refresh = () => {
-    if (match.state.ply !== lastPly) { lastPly = match.state.ply; board.reset(); }
+    if (match.state.ply !== lastPly) {
+      const moved = lastPly >= 0 && match.state.ply > lastPly;
+      lastPly = match.state.ply;
+      board.reset();
+      const last = match.lastMove;
+      if (moved && last) sound.play(...moveSounds(match.state, last));
+    }
     else board.draw();
     renderCaptured(top.captured, match.captured[opposite(route.color)], route.color);
     renderCaptured(bottom.captured, match.captured[route.color], opposite(route.color));
@@ -107,7 +116,8 @@ export const gameScreen: Screen<Extract<Route, { name: 'game' }>> = (app, root, 
       const r = match.result;
       status.textContent = r.winner === null ? `Draw ${REASONS[r.reason]}.`
         : r.winner === route.color ? `You win ${REASONS[r.reason]}.` : `You lose ${REASONS[r.reason]}.`;
-      if (!shownResult) { shownResult = true; setTimeout(showResult, 500); }
+      // Let the checkmate sting ring out before the verdict.
+      if (!shownResult) { shownResult = true; setTimeout(showResult, r.reason === 'checkmate' ? 1900 : 500); }
     } else if (match.aiThinking) status.textContent = `${OPPONENTS[route.difficulty]} is thinking…`;
     else if (match.isPlayerTurn) status.textContent = recs.at(-1)?.label.endsWith('+') ? 'Check! Your move.' : 'Your move.';
     else status.textContent = '';
@@ -118,6 +128,7 @@ export const gameScreen: Screen<Extract<Route, { name: 'game' }>> = (app, root, 
     const outcome: Outcome = r.winner === null ? 'draw' : r.winner === route.color ? 'win' : 'loss';
     app.progress.stats[outcome === 'win' ? 'wins' : outcome === 'loss' ? 'losses' : 'draws']++;
     const award = awardXp(app.progress, xpForGame(outcome, route.difficulty));
+    sound.play(outcome);
     app.save();
     const headline = { win: 'Case closed', loss: 'The case went cold', draw: 'A stalemate of wills' }[outcome];
     let close = () => {};

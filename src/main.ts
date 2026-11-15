@@ -9,6 +9,7 @@ import { gameScreen } from './ui/screens/game';
 import { casesScreen } from './ui/screens/cases';
 import { caseScreen } from './ui/screens/case';
 import { clear } from './ui/dom';
+import { sound } from './audio/sound';
 
 const root = document.getElementById('app')!;
 let cleanup: () => void = () => {};
@@ -33,5 +34,9 @@ const app: App = {
     }
   },
 };
+
+sound.enabled = app.progress.sound;
+// Browsers only allow audio after a user gesture — wake the audio engine on the first tap/click.
+window.addEventListener('pointerdown', () => sound.unlock(), { once: true });
 
 app.go({ name: 'menu' });
