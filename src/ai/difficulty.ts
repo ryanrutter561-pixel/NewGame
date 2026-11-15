@@ -22,6 +22,6 @@ export const DIFFICULTIES: Record<Difficulty, DifficultyInfo> = {
   },
   inspector: {
     id: 'inspector', name: 'Inspector', blurb: 'Sharp eyes. Rarely misses a hanging piece.',
-    xpMultiplier: 2, search: { maxDepth: 4, timeMs: 1500, noise: 15 },
+    xpMultiplier: 2, search: { maxDepth: 3, timeMs: 1500, noise: 0 },
   },
 };
