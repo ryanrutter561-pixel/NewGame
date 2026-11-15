@@ -1,6 +1,6 @@
 import type { Screen } from '../app';
 import { h } from '../dom';
-import { soundToggle, xpBar } from '../components';
+import { devToggle, soundToggle, xpBar } from '../components';
 import { pieceIcon } from '../pieceArt';
 import { levelInfo, UNLOCKS } from '../../game/progression';
 import { PUZZLES } from '../../data/puzzles';
@@ -19,13 +19,14 @@ export const menuScreen: Screen = (app, root) => {
       h('span', { class: 'menu-sub' }, sub));
 
   root.append(h('main', { class: 'screen menu' },
-    h('div', { class: 'top-right' }, soundToggle(app)),
+    h('div', { class: 'top-right' }, devToggle(app, () => app.go({ name: 'menu' })), soundToggle(app)),
     h('header', { class: 'title-block' },
       h('div', { class: 'title-icons' }, pieceIcon('K', 'b', 44), pieceIcon('Q', 'w', 44)),
       h('h1', { class: 'title' }, 'Noir Chess'),
       h('p', { class: 'subtitle' }, 'Every piece has a past.')),
     h('section', { class: 'dossier' },
-      h('div', { class: 'dossier-label' }, 'Detective file'),
+      h('div', { class: 'dossier-label' }, app.dev ? 'Detective file · DEV profile' : 'Detective file'),
+      app.dev ? h('p', { class: 'dev-note' }, 'Dev mode: max-level test profile with every piece unlocked. Your real progress is untouched — switch dev mode off to return to it.') : null,
       xpBar(p.xp),
       h('div', { class: 'dossier-row' },
         h('span', null, `Record ${p.stats.wins}W · ${p.stats.losses}L · ${p.stats.draws}D`),

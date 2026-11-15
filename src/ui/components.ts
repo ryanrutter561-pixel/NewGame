@@ -25,6 +25,20 @@ export function soundToggle(app: App): HTMLButtonElement {
   return btn;
 }
 
+/** Dev mode switch: swaps to a separate max-level profile (real progress is kept aside). */
+export function devToggle(app: App, onChange: () => void): HTMLButtonElement {
+  const btn = h('button', { class: 'sound-toggle dev-toggle', type: 'button', title: 'Play-test on a separate max-level profile. Your real progress is kept safe.' });
+  btn.textContent = app.dev ? '⚙ Dev mode on' : '⚙ Dev mode off';
+  btn.classList.toggle('off', !app.dev);
+  btn.classList.toggle('active', app.dev);
+  btn.setAttribute('aria-pressed', String(app.dev));
+  btn.addEventListener('click', () => {
+    app.setDev(!app.dev);
+    onChange();
+  });
+  return btn;
+}
+
 export function xpBar(xp: number): HTMLElement {
   const { level, into, needed } = levelInfo(xp);
   const pct = Math.min(100, (into / needed) * 100);

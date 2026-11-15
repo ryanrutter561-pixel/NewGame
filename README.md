@@ -29,6 +29,10 @@ One-time setup: **Settings → Pages → Build and deployment → Source: GitHub
   - Reaching level *n+1* takes 150·*n* XP.
 - **Unlocks:** the Marshal at level 3 and the Cavalry at level 5. Detective and Inspector opponents may field your unlocked pieces too.
 
+### Dev mode
+
+**⚙ Dev mode** (top right of the main menu, next to the sound button) switches to a separate level-10 test profile with every piece unlocked, for play-testing. Your real progress is saved separately and is untouched. Turn dev mode off to return to it. While it's on, the menu and the in-game name bar show "DEV".
+
 ### Board controls
 
 - **Move:** drag a piece, or click it and then click a square.

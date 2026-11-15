@@ -1,7 +1,7 @@
 import './ui/theme.css';
 import type { App, Route } from './ui/app';
 import { AIClient } from './ai/client';
-import { loadProgress, saveProgress } from './game/save';
+import { loadDevFlag, loadProgress, saveDevFlag, saveProgress } from './game/save';
 import { menuScreen } from './ui/screens/menu';
 import { setupScreen } from './ui/screens/setup';
 import { loadoutScreen } from './ui/screens/loadout';
@@ -15,10 +15,21 @@ const root = document.getElementById('app')!;
 let cleanup: () => void = () => {};
 let ai: AIClient | null = null;
 
+const startDev = loadDevFlag();
+
 const app: App = {
   root,
-  progress: loadProgress(),
-  save: () => saveProgress(app.progress),
+  dev: startDev,
+  progress: loadProgress(startDev),
+  save: () => saveProgress(app.progress, app.dev),
+  setDev(on: boolean) {
+    app.save();
+    app.dev = on;
+    saveDevFlag(on);
+    app.progress = loadProgress(on);
+    sound.enabled = app.progress.sound;
+    app.save();
+  },
   ai: () => (ai ??= new AIClient()),
   go(route: Route) {
     cleanup();

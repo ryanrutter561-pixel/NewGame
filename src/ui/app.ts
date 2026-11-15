@@ -14,6 +14,9 @@ export type Route =
 export interface App {
   root: HTMLElement;
   progress: Progress;
+  /** Dev mode: playing on a separate max-level profile. */
+  dev: boolean;
+  setDev(on: boolean): void;
   save(): void;
   go(route: Route): void;
   ai(): AIClient;

@@ -87,7 +87,7 @@ export const gameScreen: Screen<Extract<Route, { name: 'game' }>> = (app, root, 
   };
   const { level } = levelInfo(app.progress.xp);
   const top = bar(opposite(route.color), `${diff.name} — ${OPPONENTS[route.difficulty]}`, LOADOUTS[aiLoadout].name);
-  const bottom = bar(route.color, `You · Level ${level}`, LOADOUTS[app.progress.loadout].name);
+  const bottom = bar(route.color, `You · Level ${level}${app.dev ? ' · DEV' : ''}`, LOADOUTS[app.progress.loadout].name);
   const status = h('div', { class: 'status', 'aria-live': 'polite' });
   const moves = h('ol', { class: 'moves' });
 

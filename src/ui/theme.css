@@ -103,7 +103,10 @@ button:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
 .sound-toggle:hover { color: var(--ink); border-color: var(--muted); }
 .sound-toggle.off { text-decoration: line-through; opacity: 0.7; }
 .side > .sound-toggle { margin-top: 12px; }
-.top-right { display: flex; justify-content: flex-end; }
+.top-right { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.dev-toggle.active { color: var(--lamp); border-color: var(--lamp); text-decoration: none; opacity: 1; }
+.dev-note { color: var(--lamp); font-size: 0.85rem; margin: 0 0 10px; }
+.dev-badge { color: var(--lamp); font-size: 0.75rem; letter-spacing: 0.12em; }
 
 /* ── Menu ─────────────────────────────────────────────────────────────── */
 .title-block { text-align: center; margin: 24px 0 28px; }
