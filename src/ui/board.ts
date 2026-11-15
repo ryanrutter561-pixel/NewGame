@@ -3,6 +3,7 @@ import type { Color, Move, Piece } from '../engine/types';
 import { fileOf, rankOf, sq, squareName } from '../engine/square';
 import { inCheck } from '../engine/movegen';
 import { drawCavalry, drawPiece, pieceIcon } from './pieceArt';
+import { resolvePremove } from '../engine/premove';
 
 export interface BoardSource {
   state: GameState;
@@ -12,7 +13,39 @@ export interface BoardSource {
   legal: Move[];
   lastMove?: Move;
   hint?: Move | null;
+  /** Moves that may be queued during the opponent's turn (premoves). */
+  premoves?: Move[];
+  /** The queued premove, highlighted until it plays or is cancelled. */
+  premove?: Move | null;
 }
+
+export interface BoardOptions {
+  /** Queue (or with null, cancel) a premove. Without it, the board offers no premoves. */
+  onPremove?: (m: Move | null) => void;
+}
+
+interface Drag {
+  pieceId: number;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  x: number;
+  y: number;
+  /** Where inside the piece it was grabbed, so it doesn't jump under the cursor. */
+  offX: number;
+  offY: number;
+  active: boolean;
+  /** Clicking an already-selected piece (without dragging) deselects it. */
+  deselectOnUp: boolean;
+}
+
+interface Arrow { from: number; to: number; color: string }
+
+const MARK = {
+  red: 'rgba(200, 40, 30, 0.75)',
+  gold: 'rgba(222, 184, 92, 0.85)',
+  blue: 'rgba(90, 140, 200, 0.85)',
+};
 
 const COLORS = {
   light: '#bdb6a8',
@@ -21,13 +54,18 @@ const COLORS = {
   selected: 'rgba(179, 38, 30, 0.45)',
   target: 'rgba(179, 38, 30, 0.75)',
   hint: 'rgba(222, 184, 92, 0.55)',
+  premove: 'rgba(80, 110, 150, 0.55)',
+  premoveTarget: 'rgba(80, 120, 170, 0.8)',
   coordLight: '#3a3936',
   coordDark: '#bdb6a8',
 };
 
 const ARROWS: Record<string, string> = { '0,1': '↑', '0,-1': '↓', '1,0': '→', '-1,0': '←' };
 
-/** Canvas chessboard with click-to-move input, a Cavalry route chooser and a promotion picker. */
+/**
+ * Canvas chessboard. Click-click or drag-and-drop to move, premoves during the opponent's turn,
+ * right-click (drag) to draw arrows and circles, plus a Cavalry route chooser and promotion picker.
+ */
 export class BoardView {
   readonly el: HTMLDivElement;
   private readonly canvas: HTMLCanvasElement;
@@ -39,10 +77,19 @@ export class BoardView {
   private hoverMove: Move | null = null;
   private popup: HTMLDivElement | null = null;
   private flash: { squares: number[]; until: number; color: string } | null = null;
+  private drag: Drag | null = null;
+  private arrows: Arrow[] = [];
+  private circles: { sq: number; color: string }[] = [];
+  /** Right-button annotation being drawn. */
+  private drawing: Arrow | null = null;
   private readonly resizeObserver: ResizeObserver;
   private raf = 0;
 
-  constructor(private readonly source: () => BoardSource, private readonly onMove: (m: Move) => void) {
+  constructor(
+    private readonly source: () => BoardSource,
+    private readonly onMove: (m: Move) => void,
+    private readonly opts: BoardOptions = {},
+  ) {
     this.el = document.createElement('div');
     this.el.className = 'board';
     this.canvas = document.createElement('canvas');
@@ -52,8 +99,11 @@ export class BoardView {
     this.ctx = this.canvas.getContext('2d')!;
     this.canvas.addEventListener('pointerdown', (e) => this.onPointerDown(e));
     this.canvas.addEventListener('pointermove', (e) => this.onPointerMove(e));
+    this.canvas.addEventListener('pointerup', (e) => this.onPointerUp(e));
+    this.canvas.addEventListener('pointercancel', () => { this.drag = null; this.drawing = null; this.draw(); });
+    this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     this.canvas.addEventListener('pointerleave', () => {
-      if (!this.popup) { this.hoverMove = null; this.draw(); }
+      if (!this.popup && !this.drag) { this.hoverMove = null; this.draw(); }
     });
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(this.el);
@@ -69,11 +119,22 @@ export class BoardView {
     this.el.remove();
   }
 
-  /** Forget any selection (call when the position changes from outside). */
+  /** Forget the selection (call when the position changes). A piece being dragged stays in hand. */
   reset(): void {
-    this.selected = null;
+    const keep = this.drag && this.source().state.pieces.has(this.drag.pieceId);
+    if (!keep) {
+      this.drag = null;
+      this.selected = null;
+    }
     this.hoverMove = null;
     this.closePopup();
+    this.draw();
+  }
+
+  /** Remove all arrows and circles. */
+  clearAnnotations(): void {
+    this.arrows = [];
+    this.circles = [];
     this.draw();
   }
 
@@ -89,7 +150,14 @@ export class BoardView {
   }
 
   private onKey = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') { this.selected = null; this.hoverMove = null; this.closePopup(); this.draw(); }
+    if (e.key === 'Escape') {
+      this.selected = null;
+      this.hoverMove = null;
+      this.drag = null;
+      this.closePopup();
+      if (this.source().premove) this.opts.onPremove?.(null);
+      this.draw();
+    }
   };
 
   private resize(): void {
@@ -145,41 +213,149 @@ export class BoardView {
     return [m.to[0]];
   }
 
+  /** Moves the player can make now: real moves on their turn, premoves during the opponent's. */
+  private activeMoves(): Move[] {
+    const src = this.source();
+    if (src.legal.length) return src.legal;
+    return this.opts.onPremove ? src.premoves ?? [] : [];
+  }
+
   private selectedMoves(): Move[] {
     if (this.selected === null) return [];
-    return this.source().legal.filter((m) => m.pieceId === this.selected);
+    return this.activeMoves().filter((m) => m.pieceId === this.selected);
+  }
+
+  private pointerXY(e: PointerEvent): [number, number] {
+    const r = this.canvas.getBoundingClientRect();
+    return [e.clientX - r.left, e.clientY - r.top];
+  }
+
+  private targetsAt(s: number | null): Move[] {
+    return s === null ? [] : this.selectedMoves().filter((m) => this.clickSquares(m).includes(s));
   }
 
   private onPointerDown(e: PointerEvent): void {
     e.preventDefault();
-    if (this.popup) { this.closePopup(); this.draw(); return; }
+    if (e.button === 2) { this.startAnnotation(e); return; }
+    if (e.button !== 0) return;
+    if (this.arrows.length || this.circles.length) { this.arrows = []; this.circles = []; }
+    if (this.popup) { this.closePopup(); this.hoverMove = null; this.draw(); return; }
     const s = this.pointToSquare(e);
     if (s === null) return;
-    const src = this.source();
-    const candidates = this.selectedMoves().filter((m) => this.clickSquares(m).includes(s));
+
+    const candidates = this.targetsAt(s);
     if (candidates.length) { this.resolve(candidates, s); return; }
 
-    const p = src.state.pieceAt(s);
-    const movable = p && src.legal.some((m) => m.pieceId === p.id);
-    this.selected = movable && this.selected !== p.id ? p.id : null;
+    const p = this.source().state.pieceAt(s);
+    if (p && this.activeMoves().some((m) => m.pieceId === p.id)) {
+      const wasSelected = this.selected === p.id;
+      this.selected = p.id;
+      const [x, y] = this.pointerXY(e);
+      const [rx, ry] = this.pieceRect(p.squares);
+      this.drag = {
+        pieceId: p.id, pointerId: e.pointerId, startX: x, startY: y, x, y,
+        offX: x - rx, offY: y - ry, active: false, deselectOnUp: wasSelected,
+      };
+      try { this.canvas.setPointerCapture(e.pointerId); } catch { /* not supported */ }
+    } else {
+      this.selected = null;
+    }
     this.hoverMove = null;
     this.draw();
   }
 
   private onPointerMove(e: PointerEvent): void {
-    if (this.popup || this.selected === null) return;
-    const piece = this.source().state.pieces.get(this.selected);
-    if (!piece || piece.type !== 'C') return;
-    const s = this.pointToSquare(e);
-    const m = s === null ? null : this.selectedMoves().find((x) => this.clickSquares(x).includes(s)) ?? null;
-    if (m !== this.hoverMove) { this.hoverMove = m; this.draw(); }
+    if (this.drawing) {
+      const s = this.pointToSquare(e);
+      if (s !== null && s !== this.drawing.to) { this.drawing.to = s; this.draw(); }
+      return;
+    }
+    let redraw = false;
+    if (this.drag) {
+      const [x, y] = this.pointerXY(e);
+      this.drag.x = x;
+      this.drag.y = y;
+      if (!this.drag.active && Math.hypot(x - this.drag.startX, y - this.drag.startY) > 4) {
+        this.drag.active = true;
+        this.canvas.style.cursor = 'grabbing';
+      }
+      redraw = this.drag.active;
+    }
+    // Cavalry: preview the route under the pointer.
+    if (!this.popup && this.selected !== null && this.source().state.pieces.get(this.selected)?.type === 'C') {
+      const m = this.targetsAt(this.pointToSquare(e))[0] ?? null;
+      if (m !== this.hoverMove) { this.hoverMove = m; redraw = true; }
+    }
+    if (redraw) this.draw();
   }
 
+  private onPointerUp(e: PointerEvent): void {
+    if (e.button === 2) { this.finishAnnotation(); return; }
+    const d = this.drag;
+    if (!d) return;
+    this.drag = null;
+    this.canvas.style.cursor = '';
+    try { this.canvas.releasePointerCapture(d.pointerId); } catch { /* already released */ }
+    if (d.active) {
+      const s = this.pointToSquare(e);
+      const candidates = this.targetsAt(s);
+      if (candidates.length) { this.resolve(candidates, s!); return; }
+      // Dropped back on itself: keep it selected for click-to-move. Anywhere else: let go.
+      const piece = this.source().state.pieces.get(d.pieceId);
+      if (s === null || !piece?.squares.includes(s)) this.selected = null;
+    } else if (d.deselectOnUp) {
+      this.selected = null;
+    }
+    if (!this.popup) this.hoverMove = null;
+    this.draw();
+  }
+
+  private startAnnotation(e: PointerEvent): void {
+    const s = this.pointToSquare(e);
+    if (s === null) return;
+    // Right-click also drops the selection and cancels a queued premove.
+    this.selected = null;
+    this.hoverMove = null;
+    this.drag = null;
+    this.closePopup();
+    if (this.source().premove) this.opts.onPremove?.(null);
+    const color = e.shiftKey ? MARK.gold : e.altKey || e.ctrlKey || e.metaKey ? MARK.blue : MARK.red;
+    this.drawing = { from: s, to: s, color };
+    try { this.canvas.setPointerCapture(e.pointerId); } catch { /* not supported */ }
+    this.draw();
+  }
+
+  private finishAnnotation(): void {
+    const a = this.drawing;
+    this.drawing = null;
+    if (!a) return;
+    if (a.from === a.to) {
+      const i = this.circles.findIndex((c) => c.sq === a.from);
+      const same = i >= 0 && this.circles[i].color === a.color;
+      if (i >= 0) this.circles.splice(i, 1);
+      if (!same) this.circles.push({ sq: a.from, color: a.color });
+    } else {
+      const i = this.arrows.findIndex((x) => x.from === a.from && x.to === a.to);
+      const same = i >= 0 && this.arrows[i].color === a.color;
+      if (i >= 0) this.arrows.splice(i, 1);
+      if (!same) this.arrows.push(a);
+    }
+    this.draw();
+  }
+
+  /** Play the move now, or queue it as a premove — whichever the current turn allows. */
   private commit(m: Move): void {
     this.selected = null;
     this.hoverMove = null;
+    this.drag = null;
     this.closePopup();
-    this.onMove(m);
+    const src = this.source();
+    if (src.legal.includes(m)) this.onMove(m);
+    else if (src.legal.length) {
+      // A premove picked just as our turn began: play it if it's legal now.
+      const real = resolvePremove(m, src.legal);
+      if (real) this.onMove(real);
+    } else if ((src.premoves ?? []).includes(m)) this.opts.onPremove?.(m);
     this.draw();
   }
 
@@ -215,7 +391,7 @@ export class BoardView {
   }
 
   private openPromotion(moves: Move[], s: number): void {
-    const color = this.source().state.turn;
+    const color = this.source().state.pieces.get(moves[0].pieceId)?.color ?? this.source().state.turn;
     const pop = this.openPopup(s, 'Promote to');
     const row = document.createElement('div');
     row.className = 'board-popup-row';
@@ -285,6 +461,7 @@ export class BoardView {
     if (src.lastMove) {
       for (const s of new Set([...src.lastMove.from, ...src.lastMove.to])) this.fillSquare(s, COLORS.lastMove);
     }
+    if (src.premove) for (const s of new Set([...src.premove.from, ...src.premove.to])) this.fillSquare(s, COLORS.premove);
     if (src.hint) for (const s of src.hint.from) this.fillSquare(s, COLORS.hint);
     if (this.flash) for (const s of this.flash.squares) this.fillSquare(s, this.flash.color);
 
@@ -304,13 +481,71 @@ export class BoardView {
     this.drawCoordinates();
 
     // Snapshot: never iterate the live map while other code might make/undo moves.
+    const dragging = this.drag?.active ? this.drag : null;
     for (const p of [...st.pieces.values()]) {
-      const ghosted = this.hoverMove && this.hoverMove.pieceId === p.id;
+      const ghosted = (this.hoverMove && this.hoverMove.pieceId === p.id) || dragging?.pieceId === p.id;
       this.drawPieceAt(p, p.squares, ghosted ? 0.35 : 1);
     }
 
-    if (selectedPiece) this.drawTargets(st, selectedPiece);
-    if (this.hoverMove) this.drawGhost(st, this.hoverMove);
+    if (selectedPiece) this.drawTargets(st, selectedPiece, src.legal.length ? COLORS.target : COLORS.premoveTarget);
+    if (this.hoverMove && !dragging) this.drawGhost(st, this.hoverMove);
+
+    for (const c of this.circles) this.drawCircle(c.sq, c.color);
+    for (const a of this.arrows) this.drawArrow(a.from, a.to, a.color);
+    if (this.drawing) {
+      if (this.drawing.from === this.drawing.to) this.drawCircle(this.drawing.from, this.drawing.color);
+      else this.drawArrow(this.drawing.from, this.drawing.to, this.drawing.color);
+    }
+
+    // The piece in hand floats above everything.
+    const held = dragging ? st.pieces.get(dragging.pieceId) : undefined;
+    if (dragging && held) {
+      const [, , w, h] = this.pieceRect(held.squares);
+      const x = dragging.x - dragging.offX, y = dragging.y - dragging.offY;
+      const pad = cell * 0.06;
+      if (held.type === 'C') drawCavalry(ctx, held.color, x, y, w, h, cell, {});
+      else drawPiece(ctx, held.type, held.color, x + pad, y + pad, cell - pad * 2, { phase: held.phase });
+    }
+  }
+
+  private center(s: number): [number, number] {
+    const [x, y] = this.squareXY(s);
+    return [x + this.cell / 2, y + this.cell / 2];
+  }
+
+  private drawCircle(s: number, color: string): void {
+    const [cx, cy] = this.center(s);
+    const { ctx, cell } = this;
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = cell * 0.07;
+    ctx.beginPath();
+    ctx.arc(cx, cy, cell * 0.44, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  private drawArrow(from: number, to: number, color: string): void {
+    const { ctx, cell } = this;
+    const [x1, y1] = this.center(from);
+    const [x2, y2] = this.center(to);
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    const head = cell * 0.42, width = cell * 0.15;
+    ctx.save();
+    ctx.translate(x1, y1);
+    ctx.rotate(Math.atan2(y2 - y1, x2 - x1));
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(cell * 0.12, -width / 2);
+    ctx.lineTo(len - head, -width / 2);
+    ctx.lineTo(len - head, -head * 0.5);
+    ctx.lineTo(len, 0);
+    ctx.lineTo(len - head, head * 0.5);
+    ctx.lineTo(len - head, width / 2);
+    ctx.lineTo(cell * 0.12, width / 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
   }
 
   private fillSquare(s: number, color: string): void {
@@ -330,7 +565,7 @@ export class BoardView {
     }
   }
 
-  private drawTargets(st: GameState, piece: Piece): void {
+  private drawTargets(st: GameState, piece: Piece, color: string): void {
     const { ctx, cell } = this;
     const seen = new Set<number>();
     for (const m of this.selectedMoves()) {
@@ -341,13 +576,13 @@ export class BoardView {
         const occ = st.pieceAt(s);
         ctx.save();
         if (occ && occ.color !== piece.color) {
-          ctx.strokeStyle = COLORS.target;
+          ctx.strokeStyle = color;
           ctx.lineWidth = cell * 0.08;
           ctx.beginPath();
           ctx.arc(x + cell / 2, y + cell / 2, cell * 0.43, 0, Math.PI * 2);
           ctx.stroke();
         } else {
-          ctx.fillStyle = COLORS.target;
+          ctx.fillStyle = color;
           ctx.beginPath();
           ctx.arc(x + cell / 2, y + cell / 2, cell * 0.14, 0, Math.PI * 2);
           ctx.fill();

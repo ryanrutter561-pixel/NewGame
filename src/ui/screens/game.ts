@@ -12,6 +12,9 @@ import { pieceIcon } from '../pieceArt';
 import { awardPanel, showModal, soundToggle } from '../components';
 import { sound } from '../../audio/sound';
 import { moveSounds } from '../../audio/moveSounds';
+import { AIClient } from '../../ai/client';
+import { MATE } from '../../ai/search';
+import { EvalBar } from '../evalBar';
 import { OPPONENTS } from './setup';
 import type { EndReason } from '../../engine/rules';
 
@@ -43,18 +46,59 @@ export const gameScreen: Screen<Extract<Route, { name: 'game' }>> = (app, root, 
     state: match.state,
     orientation: route.color,
     legal: match.isPlayerTurn ? match.legal : [],
+    premoves: match.premoveCandidates,
+    premove: match.premove,
     lastMove: match.lastMove,
-  }), (m) => match.playerMove(m));
+  }), (m) => match.playerMove(m), { onPremove: (m) => match.setPremove(m) });
+
+  // Evaluation bar, fed by its own background engine so it never slows the opponent down.
+  const evalBar = new EvalBar(route.color);
+  const analyst = new AIClient();
+  const analyse = () => {
+    if (!app.progress.evalBar) return;
+    const r = match.result;
+    if (r) {
+      evalBar.show({ result: r.winner === 'w' ? '1-0' : r.winner === 'b' ? '0-1' : '½-½' });
+      return;
+    }
+    const ply = match.state.ply;
+    const pov = match.state.turn === 'w' ? 1 : -1;
+    void analyst.requestMove(match.state, { maxDepth: 6, timeMs: 400, analysis: true }).then((res) => {
+      if (match.state.ply !== ply || match.result) return;
+      const score = res.score * pov;
+      if (Math.abs(score) > MATE - 1000) {
+        evalBar.show({ mate: Math.sign(score) * Math.ceil((MATE - Math.abs(score)) / 2) });
+      } else {
+        evalBar.show({ cp: score });
+      }
+    });
+  };
+  evalBar.el.hidden = !app.progress.evalBar;
+  const evalToggle = h('button', { class: 'sound-toggle', type: 'button' });
+  const renderEvalToggle = () => {
+    evalToggle.textContent = app.progress.evalBar ? '▮ Eval bar on' : '▮ Eval bar off';
+    evalToggle.classList.toggle('off', !app.progress.evalBar);
+    evalToggle.setAttribute('aria-pressed', String(app.progress.evalBar));
+  };
+  evalToggle.addEventListener('click', () => {
+    app.progress.evalBar = !app.progress.evalBar;
+    app.save();
+    evalBar.el.hidden = !app.progress.evalBar;
+    renderEvalToggle();
+    analyse();
+  });
+  renderEvalToggle();
 
   const bar = (color: Color, name: string, sub: string) => {
     const clock = h('div', { class: 'clock', 'aria-live': 'off' }, '5:00');
     const captured = h('div', { class: 'captured' });
+    const lead = h('span', { class: 'lead' });
     const el = h('div', { class: 'player-bar' },
       h('div', { class: 'who' },
         pieceIcon('K', color, 26),
         h('div', null, h('div', { class: 'who-name' }, name), h('div', { class: 'who-sub' }, sub))),
-      captured, clock);
-    return { el, clock, captured };
+      h('div', { class: 'captured-wrap' }, captured, lead), clock);
+    return { el, clock, captured, lead };
   };
   const { level } = levelInfo(app.progress.xp);
   const top = bar(opposite(route.color), `${diff.name} — ${OPPONENTS[route.difficulty]}`, LOADOUTS[aiLoadout].name);
@@ -73,7 +117,7 @@ export const gameScreen: Screen<Extract<Route, { name: 'game' }>> = (app, root, 
   };
 
   root.append(h('main', { class: 'screen game' },
-    h('div', { class: 'board-col' }, top.el, board.el, bottom.el),
+    h('div', { class: 'board-col' }, top.el, h('div', { class: 'board-row' }, evalBar.el, board.el), bottom.el),
     h('aside', { class: 'side' },
       h('div', { class: 'case-label' }, `Case vs. ${OPPONENTS[route.difficulty]}`),
       status,
@@ -81,7 +125,10 @@ export const gameScreen: Screen<Extract<Route, { name: 'game' }>> = (app, root, 
       h('div', { class: 'row' },
         h('button', { class: 'btn', on: { click: leave } }, 'Resign'),
         h('button', { class: 'btn ghost', on: { click: leave } }, 'Menu')),
-      soundToggle(app))));
+      h('div', { class: 'row toggles' }, soundToggle(app), evalToggle),
+      h('p', { class: 'muted small tips' },
+        'Drag or click to move. While they think, queue a premove; right-click cancels it. ',
+        'Right-click and drag to draw arrows (Shift or Alt for other colours).'))));
 
   const renderCaptured = (el: HTMLElement, types: PieceType[], color: Color) => {
     const sorted = [...types].sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
@@ -97,10 +144,15 @@ export const gameScreen: Screen<Extract<Route, { name: 'game' }>> = (app, root, 
       board.reset();
       const last = match.lastMove;
       if (moved && last) sound.play(...moveSounds(match.state, last));
+      analyse();
     }
     else board.draw();
     renderCaptured(top.captured, match.captured[opposite(route.color)], route.color);
     renderCaptured(bottom.captured, match.captured[route.color], opposite(route.color));
+    for (const [c, b] of [[route.color, bottom], [opposite(route.color), top]] as const) {
+      const n = match.materialLead(c);
+      b.lead.textContent = n > 0 ? `+${n}` : '';
+    }
 
     const recs = match.records;
     const items: HTMLElement[] = [];
@@ -163,6 +215,7 @@ export const gameScreen: Screen<Extract<Route, { name: 'game' }>> = (app, root, 
     cancelAnimationFrame(raf);
     unsubscribe();
     match.dispose();
+    analyst.dispose();
     board.destroy();
   };
 };

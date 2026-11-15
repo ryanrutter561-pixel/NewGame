@@ -8,6 +8,8 @@ import { startingPosition, type LoadoutId } from '../engine/loadouts';
 import { DIFFICULTIES, type Difficulty } from '../ai/difficulty';
 import type { AIRequest } from '../ai/worker';
 import { ChessClock } from './clock';
+import { premoveCandidates, resolvePremove } from '../engine/premove';
+import { materialBalance } from './material';
 
 export interface MatchConfig {
   playerColor: Color;
@@ -37,9 +39,14 @@ export class Match {
   readonly captured: Record<Color, PieceType[]> = { w: [], b: [] };
   result: GameResult | null = null;
   aiThinking = false;
+  /** A move queued during the AI's turn; played the moment the AI replies if still legal. */
+  premove: Move | null = null;
   private readonly reps = new Map<string, number>();
   private readonly listeners = new Set<() => void>();
   private legalCache: { ply: number; moves: Move[] } | null = null;
+  private premoveCache: { ply: number; moves: Move[] } | null = null;
+  /** White's material balance at the start — armies can differ, so leads are measured from here. */
+  private readonly startBalance: number;
   private disposed = false;
 
   constructor(
@@ -52,6 +59,28 @@ export class Match {
     this.state = startingPosition(white, black);
     this.clock = new ChessClock(config.timeMs, now);
     this.reps.set(positionKey(this.state), 1);
+    this.startBalance = materialBalance(this.state, 'w');
+  }
+
+  /** Moves the player may queue right now (only during the AI's turn). */
+  get premoveCandidates(): Move[] {
+    if (this.result || this.isPlayerTurn) return [];
+    if (!this.premoveCache || this.premoveCache.ply !== this.state.ply) {
+      this.premoveCache = { ply: this.state.ply, moves: premoveCandidates(this.state, this.config.playerColor) };
+    }
+    return this.premoveCache.moves;
+  }
+
+  setPremove(move: Move | null): void {
+    if (move && (this.result || this.isPlayerTurn)) return;
+    this.premove = move;
+    this.emit();
+  }
+
+  /** Material lead in points for `color`, relative to the starting armies (negative = behind). */
+  materialLead(color: Color): number {
+    const lead = materialBalance(this.state, 'w') - this.startBalance;
+    return color === 'w' ? lead : 0 - lead;
   }
 
   get aiColor(): Color {
@@ -136,6 +165,7 @@ export class Match {
 
   private finish(result: GameResult): void {
     this.result = result;
+    this.premove = null;
     this.aiThinking = false;
     this.clock.stop();
     this.ai.cancelAll();
@@ -157,6 +187,16 @@ export class Match {
     this.aiThinking = false;
     const move = res.moveKey ? findMove(this.legal, res.moveKey) : undefined;
     if (move) this.apply(move);
+    else this.emit();
+    this.playPremove();
+  }
+
+  private playPremove(): void {
+    const queued = this.premove;
+    if (!queued || this.result || !this.isPlayerTurn) return;
+    this.premove = null;
+    const move = resolvePremove(queued, this.legal);
+    if (move) this.playerMove(move);
     else this.emit();
   }
 }

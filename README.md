@@ -29,6 +29,14 @@ One-time setup: **Settings → Pages → Build and deployment → Source: GitHub
   - Reaching level *n+1* takes 150·*n* XP.
 - **Unlocks:** the Marshal at level 3 and the Cavalry at level 5. Detective and Inspector opponents may field your unlocked pieces too.
 
+### Board controls
+
+- **Move:** drag a piece, or click it and then click a square.
+- **Premove:** while the opponent is thinking, move a piece anyway. The move is queued (shown in slate blue) and plays the instant they reply, if it's still legal. Right-click or Esc cancels it.
+- **Draw:** right-click and drag to draw an arrow, or right-click a square to circle it. Hold Shift for gold or Alt for blue. A left-click clears them.
+- **Material:** the "+N" next to captured pieces shows who's ahead in material, counted from the starting armies, since armies can differ.
+- **Eval bar:** a bar beside the board shows the position's evaluation from a separate background engine, e.g. "1.4" pawns or "M3" (mate in 3). It can be toggled off, and it isn't shown in puzzles.
+
 ### Sound
 
 All sounds are synthesized live with the Web Audio API (`src/audio/sound.ts`), so there are no audio files:

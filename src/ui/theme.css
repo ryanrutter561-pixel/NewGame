@@ -242,7 +242,7 @@ button:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
   width: 100%;
   aspect-ratio: 1;
   box-shadow: 0 0 0 6px #050505, 0 0 0 7px var(--line), 0 24px 60px rgba(0, 0, 0, 0.8);
-  touch-action: manipulation;
+  touch-action: none;
   user-select: none;
 }
 .board canvas { display: block; cursor: pointer; }
@@ -278,7 +278,33 @@ button:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
 .who { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .who-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .who-sub { color: var(--muted); font-size: 0.8rem; }
-.captured { flex: 1; display: flex; flex-wrap: wrap; gap: 0; min-width: 0; }
+.captured-wrap { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.captured { display: flex; flex-wrap: wrap; gap: 0; min-width: 0; }
+.lead { color: var(--muted); font-size: 0.9rem; white-space: nowrap; }
+
+.board-row { display: flex; gap: 14px; align-items: stretch; }
+.board-row .board { flex: 1; min-width: 0; }
+.eval-bar {
+  position: relative;
+  flex: none;
+  width: 18px;
+  background: #1c1c1e;
+  border: 1px solid var(--line);
+  box-shadow: 0 0 0 3px #050505;
+  overflow: hidden;
+}
+.eval-bar[hidden] { display: none; }
+.eval-fill { position: absolute; left: 0; right: 0; bottom: 0; background: #efe8d8; transition: height 0.45s ease-out; }
+.eval-bar.flip { background: #efe8d8; }
+.eval-bar.flip .eval-fill { background: #1c1c1e; }
+.eval-label {
+  position: absolute; left: 0; right: 0; top: 3px;
+  font-size: 9px; line-height: 1; text-align: center; letter-spacing: -0.04em;
+  color: #efe8d8; mix-blend-mode: difference;
+}
+.eval-label.at-bottom { top: auto; bottom: 3px; }
+.toggles { margin-top: 12px; }
+.tips { margin-top: 12px; margin-bottom: 0; }
 .clock {
   font-family: var(--type);
   font-size: 1.5rem;

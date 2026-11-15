@@ -11,11 +11,13 @@ export interface Progress {
   loadout: LoadoutId;
   /** Sound effects on/off. */
   sound: boolean;
+  /** Show the evaluation bar in games. */
+  evalBar: boolean;
   stats: { wins: number; losses: number; draws: number };
 }
 
 export const newProgress = (): Progress => ({
-  version: 1, xp: 0, solvedPuzzles: [], loadout: 'standard', sound: true, stats: { wins: 0, losses: 0, draws: 0 },
+  version: 1, xp: 0, solvedPuzzles: [], loadout: 'standard', sound: true, evalBar: true, stats: { wins: 0, losses: 0, draws: 0 },
 });
 
 export interface Unlock {
